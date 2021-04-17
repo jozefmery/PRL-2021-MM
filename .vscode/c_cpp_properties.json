@@ -1,0 +1,11 @@
+{
+  "configurations": [
+    {
+      "name": "foo",
+      "intelliSenseMode": "clang-x64",
+      "includePath": ["/usr/lib/x86_64-linux-gnu/openmpi/include/"]
+      
+    }
+  ],
+  "version": 4
+}
