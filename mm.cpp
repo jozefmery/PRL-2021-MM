@@ -131,6 +131,35 @@ void Matrix::check_file_not_empty() const {
   }
 }
 
+void Matrix::check_consistent_rows() const {
+
+  // there is at least one item
+  auto cols{ data_[0].size() };
+
+  // make sure all rows have the same number of items
+  for(size_t i{ 1 }; i < data_.size(); ++i) {
+
+    if(data_[i].size() != cols) {
+
+      ss s;
+      s << "Inconsistent matrix rows in " << file_.name;
+
+      throw Abort{ s.str(), ExitCode::INPUT_ERROR };
+    }
+  }
+}
+
+void Matrix::check_matrix_not_empty() const {
+
+  if(data_.empty()) {
+
+    ss s;
+    s << "No matrix data in " << file_.name;
+
+    throw Abort{ s.str(), ExitCode::INPUT_ERROR };
+  }
+}
+
 Primitive Matrix::read_dimension() const {
 
   // shorthand
@@ -228,29 +257,8 @@ void Matrix::read_matrix() {
 
   std::transform(lines.begin() + 1, lines.end(), data_.begin(), [&](const string& s) { return str_to_row(s); });
 
-  if(data_.empty()) {
-
-    ss s;
-    s << "No matrix data in " << file_.name;
-
-    throw Abort{ s.str(), ExitCode::INPUT_ERROR };
-  }
-
-  // there is at least one item
-  auto cols{ data_[0].size() };
-
-  // make sure all rows have the same number of items
-  for(size_t i{ 1 }; i < data_.size(); ++i) {
-
-    if(data_[i].size() != cols) {
-
-      ss s;
-      s << "Inconsistent matrix columns in " << file_.name;
-
-      throw Abort{ s.str(), ExitCode::INPUT_ERROR };
-    }
-  }
-
+  check_matrix_not_empty();
+  check_consistent_rows();
   check_contained_dim();
 }
 

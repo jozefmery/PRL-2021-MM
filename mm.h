@@ -88,6 +88,8 @@ public /* methods */:
 private /* methods */:
 
   void check_file_not_empty() const;
+  void check_consistent_rows() const;
+  void check_matrix_not_empty() const;
   Primitive read_dimension() const;
   vec<Primitive> str_to_row(const string& str) const;
   void check_contained_dim() const;
