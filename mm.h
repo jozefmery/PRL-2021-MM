@@ -23,55 +23,15 @@ using string  = std::string;
 using ss      = std::stringstream;
 template<typename T>
 using vec     = std::vector<T>;
-
 // give raw types meaning
 using Pid       = int;
-using Primitive = int;
-template<typename T>
-using MatrixT   = vec<vec<T>>;
-using Matrix    = MatrixT<Primitive>;
-using Input     = std::array<Matrix, 2>;
 using FileName  = const char*;
 using Lines     = vec<string>;
-
-enum class MatrixDimension {
-
-  ROWS,
-  COLS
-};
-
-struct InputFile {
-
-  const FileName name;
-  const MatrixDimension contained_dim;
-};
-
-// do not use inheritance to enable
-// primitive construction
-struct ReadFile {
-
-  const FileName name;
-  const MatrixDimension contained_dim;
-  Lines lines;
-};
-
-// various constants
-constexpr bool BENCHMARK      { false };
-constexpr Pid MAIN_PROCESS    { 0 };    // constant based on OpenMPI
-// assignment based input definition
-constexpr InputFile INPUTS[]  { 
-  InputFile{ "mat1", MatrixDimension::ROWS },
-  InputFile{ "mat2", MatrixDimension::COLS } 
-};
-
-enum class ExitCode : int {
-
-  OK              = 0,
-  INPUT_ERROR     = 1,
-  MPI_ERROR       = 2,
-};
+using Primitive = int;
 
 vec<string> split_str_by(const string& str, const string& delim);
+Lines get_lines(std::istream& is);
+Primitive parse_number(const string& str);
 
 template<typename T>
 vec<T> vec_filter(const vec<T> v, const T& item) {
@@ -82,6 +42,84 @@ vec<T> vec_filter(const vec<T> v, const T& item) {
 
   return result;
 }
+
+enum class MatrixDimension {
+
+  ROWS,
+  COLS
+};
+
+struct MatrixFile {
+
+  FileName name;
+  MatrixDimension contained_dim;
+};
+
+// do not use inheritance to enable
+// primitive construction
+struct ReadMatrixFile {
+
+  FileName name;
+  MatrixDimension contained_dim;
+  Lines lines;
+};
+
+struct MatrixPos {
+
+  size_t row = 0;
+  size_t col = 0;
+};
+
+class Matrix {
+
+public /* ctors, dtor */:
+
+  explicit Matrix(const MatrixFile& file);
+
+public /* methods */:
+
+  void print() const;
+  Primitive get(const MatrixPos& pos) const;
+  void set(const MatrixPos& pos, const Primitive value);
+
+  size_t rows() const { return data_.size(); }
+  size_t cols() const { return data_[0].size(); }
+
+private /* methods */:
+
+  void check_file_not_empty() const;
+  Primitive read_dimension() const;
+  vec<Primitive> str_to_row(const string& str) const;
+  void check_contained_dim() const;
+  void read_matrix();
+
+private /* members */:
+
+  ReadMatrixFile file_;
+  vec<vec<Primitive>> data_;
+};
+
+// various constants
+constexpr bool BENCHMARK      { false };
+constexpr Pid MAIN_PROCESS    { 0 };    // constant based on OpenMPI
+// assignment based input definition
+constexpr MatrixFile MAT1{ "mat1", MatrixDimension::ROWS };
+constexpr MatrixFile MAT2{ "mat2", MatrixDimension::COLS };
+using Input = std::array<Matrix, 2>;
+
+enum class ExitCode : int {
+
+  OK              = 0,
+  INPUT_ERROR     = 1,
+  MPI_ERROR       = 2,
+  MAT_OP_ERROR    = 3
+};
+
+struct Abort {
+
+  string message;
+  ExitCode code;
+};
 
 namespace Process {
 
@@ -101,7 +139,6 @@ public /* virtual methods */:
 public /* methods */:
 
   string format_error(const string& message) const;
-  void abort(const string& message, const ExitCode exit_code) const;
 
 protected /* members */:
 
@@ -134,20 +171,12 @@ public /* ctors, dtor */:
 
   virtual ~Main() noexcept = default;
 
-private /* static functions */:
-
-  static Lines get_lines(std::istream& is);
-  static bool parse_number(const string& str, Primitive& result);
-
 public /* methods */:
 
   void run() override;
 
 private /* methods */:
 
-  Matrix read_file_to_matrix(const ReadFile& file) const;
-  Matrix read_matrix(const InputFile& file) const;
-  void read_input();
   void check_input() const;
   void check_processes() const;
 
