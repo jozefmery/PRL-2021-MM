@@ -3,31 +3,34 @@
  * Project:     PRL-2021-Proj-2-Mesh-Multiplication
  * Author:      Jozef Méry - xmeryj00@vutbr.cz
  * Date:        15.4.2021
- * Description: TODO
+ * Description: Mesh multiplication algorithm header.
  */
 
 #pragma once
 
 // std lib
-#include <memory>
 #include <string>
 #include <sstream>
 #include <vector>
 #include <array>
 #include <fstream>
 
+// OpenMPI
+#include <mpi.h>
+
 namespace MM {
 
 // export selected items from std
-using string  = std::string;
-using ss      = std::stringstream;
+using string      = std::string;
+using ss          = std::stringstream;
 template<typename T>
-using vec     = std::vector<T>;
+using vec         = std::vector<T>;
 // give raw types meaning
-using Pid       = int;
-using FileName  = const char*;
-using Lines     = vec<string>;
-using Primitive = int;
+using Pid         = int;
+using FileName    = const char*;
+using Lines       = vec<string>;
+using Primitive   = int;
+using MatrixData  = vec<vec<Primitive>>;
 
 vec<string> split_str_by(const string& str, const string& delim);
 Lines get_lines(std::istream& is);
@@ -43,7 +46,7 @@ vec<T> vec_filter(const vec<T> v, const T& item) {
   return result;
 }
 
-enum class MatrixDimension {
+enum class MatrixFileDimension {
 
   ROWS,
   COLS
@@ -52,7 +55,7 @@ enum class MatrixDimension {
 struct MatrixFile {
 
   FileName name;
-  MatrixDimension contained_dim;
+  MatrixFileDimension contained_dim;
 };
 
 // do not use inheritance to enable
@@ -60,14 +63,20 @@ struct MatrixFile {
 struct ReadMatrixFile {
 
   FileName name;
-  MatrixDimension contained_dim;
+  MatrixFileDimension contained_dim;
   Lines lines;
 };
 
 struct MatrixPos {
 
-  size_t row = 0;
-  size_t col = 0;
+  size_t row;
+  size_t col;
+};
+
+struct MatrixDimensions {
+
+  size_t rows;
+  size_t cols;
 };
 
 class Matrix {
@@ -75,6 +84,7 @@ class Matrix {
 public /* ctors, dtor */:
 
   explicit Matrix(const MatrixFile& file);
+  explicit Matrix(const MatrixDimensions& dim);
 
 public /* methods */:
 
@@ -82,8 +92,9 @@ public /* methods */:
   Primitive get(const MatrixPos& pos) const;
   void set(const MatrixPos& pos, const Primitive value);
 
-  size_t rows() const { return data_.size(); }
-  size_t cols() const { return data_[0].size(); }
+  void resize(const MatrixDimensions& dim);
+  size_t rows() const { return dim_.rows; }
+  size_t cols() const { return dim_.cols; }
 
 private /* methods */:
 
@@ -98,15 +109,16 @@ private /* methods */:
 private /* members */:
 
   ReadMatrixFile file_;
-  vec<vec<Primitive>> data_;
+  MatrixData data_;
+  MatrixDimensions dim_;
 };
 
 // various constants
 constexpr bool BENCHMARK      { false };
 constexpr Pid MAIN_PROCESS    { 0 };    // constant based on OpenMPI
 // assignment based input definition
-constexpr MatrixFile MAT1{ "mat1", MatrixDimension::ROWS };
-constexpr MatrixFile MAT2{ "mat2", MatrixDimension::COLS };
+constexpr MatrixFile MAT1{ "mat1", MatrixFileDimension::ROWS };
+constexpr MatrixFile MAT2{ "mat2", MatrixFileDimension::COLS };
 using Input = std::array<Matrix, 2>;
 
 enum class ExitCode : int {
@@ -121,6 +133,20 @@ struct Abort {
 
   string message;
   ExitCode code;
+};
+
+enum class Tag : int {
+
+  ANY   = MPI_ANY_TAG,
+  NONE  = 0,
+  LEFT  = 1,
+  UP    = 2
+};
+
+struct Message {
+
+  Primitive up;
+  Primitive left;
 };
 
 namespace Process {
@@ -160,9 +186,32 @@ public /* virtual methods */:
 
   virtual void run() override;
 
-private /* members */:
+protected /* methods */:
 
-  // TODO
+  Pid pid_up() const;
+  Pid pid_right() const;
+  Pid pid_down() const;
+  Pid pid_left() const;
+  bool first_row() const;
+  bool last_row() const;
+  bool first_col() const;
+  bool last_col() const;
+  Primitive recv(const Pid source, const Tag tag) const;
+  void send(const Pid target, const Primitive value, const Tag tag) const;
+
+  void recv_dim();
+  void enumerate();
+  void recv_message();
+  void accumulate();
+  void propagate();
+  void send_result();
+
+protected /* members */:
+
+  Message message_;
+  Primitive accumulator_;
+  MatrixDimensions dim_;
+  size_t shared_;
 };
 
 class Main : public Enumerator {
@@ -181,14 +230,18 @@ private /* methods */:
 
   void check_input() const;
   void check_processes() const;
+  void send_dim() const;
+  void recv_result();
+  void propagate_matrix() const;
 
 private /* members */:
 
   Input input_;
+  Matrix result_;
 };
 }
 
-using SpecificProcess = std::unique_ptr<Process::Base>;
+using SpecificProcess = Process::Base*;
 
 class Application {
 

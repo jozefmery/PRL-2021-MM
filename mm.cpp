@@ -3,7 +3,7 @@
  * Project:     PRL-2021-Proj-2-Mesh-Multiplication
  * Author:      Jozef Méry - xmeryj00@vutbr.cz
  * Date:        15.4.2021
- * Description: TODO
+ * Description: Mesh multiplication algorithm implementation.
  */
 
 // std lib
@@ -11,12 +11,7 @@
 #include <algorithm>
 #include <regex>
 
-// OpenMPI
-#include <mpi.h>
-
 // local
-
-
 #include "mm.h"
 
 using namespace MM;
@@ -87,6 +82,11 @@ Matrix::Matrix(const MatrixFile& file) {
   read_matrix();
 }
 
+Matrix::Matrix(const MatrixDimensions& dim) {
+
+  resize(dim);
+}
+
 void Matrix::print() const {
 
   std::cout << rows() << ":" << cols() << "\n";
@@ -118,6 +118,16 @@ void Matrix::set(const MatrixPos& pos, const Primitive value) {
   }
 
   data_[pos.row][pos.col] = value;
+}
+
+void Matrix::resize(const MatrixDimensions& dim) {
+  
+  for(size_t row = 0; row < dim.rows; ++row) {
+
+    data_.emplace_back(dim.cols, 0);
+  }
+
+  dim_ = dim;
 }
 
 void Matrix::check_file_not_empty() const {
@@ -163,7 +173,7 @@ void Matrix::check_matrix_not_empty() const {
 Primitive Matrix::read_dimension() const {
 
   // shorthand
-  const auto& lines = file_.lines;
+  const auto& lines{ file_.lines };
 
   Primitive dim_value{ -1 };
 
@@ -215,11 +225,11 @@ vec<Primitive> Matrix::str_to_row(const string& str) const {
 
 void Matrix::check_contained_dim() const {
 
-  const auto dim = read_dimension();
+  const auto dim{ read_dimension() };
   
   switch(file_.contained_dim) {
 
-    case MatrixDimension::ROWS:
+    case MatrixFileDimension::ROWS:
 
       if(rows() != dim) {
 
@@ -231,7 +241,7 @@ void Matrix::check_contained_dim() const {
 
       break;
 
-    case MatrixDimension::COLS:
+    case MatrixFileDimension::COLS:
 
       if(cols() != dim) {
 
@@ -248,7 +258,7 @@ void Matrix::check_contained_dim() const {
 void Matrix::read_matrix() {
 
   // shorthand
-  const auto& lines = file_.lines;
+  const auto& lines{ file_.lines };
 
   check_file_not_empty();
 
@@ -256,6 +266,8 @@ void Matrix::read_matrix() {
   data_.resize(lines.size() - 1);
 
   std::transform(lines.begin() + 1, lines.end(), data_.begin(), [&](const string& s) { return str_to_row(s); });
+
+  dim_ = { data_.size(), data_[0].size() };
 
   check_matrix_not_empty();
   check_consistent_rows();
@@ -277,19 +289,172 @@ string Process::Base::format_error(const string& message) const {
   return stream.str();
 }
 
+Process::Enumerator::Enumerator(const Pid pid, const int p_count) 
+
+  : Base{ pid, p_count }
+  , message_{ 0, 0 }
+  , accumulator_{ 0 }
+  , dim_{ 0, 0 }
+  , shared_{ 0 }
+{}
+
+void Process::Enumerator::run() {
+
+  recv_dim();
+  enumerate();
+}
+
+Pid Process::Enumerator::pid_up() const {
+
+  if(first_row()) {
+
+    return MAIN_PROCESS;
+  }
+
+  return pid_ - dim_.cols;
+}
+
+Pid Process::Enumerator::pid_right() const {
+
+  return pid_ + 1;
+}
+
+Pid Process::Enumerator::pid_down() const {
+
+  return pid_ + dim_.cols;
+}
+
+Pid Process::Enumerator::pid_left() const {
+
+  if(first_col()) {
+
+    return MAIN_PROCESS;
+  }
+
+  return pid_ - 1;
+}
+
+bool Process::Enumerator::first_row() const {
+
+  return pid_ < dim_.cols;
+}
+
+bool Process::Enumerator::last_row() const {
+
+  return pid_ >= (dim_.rows - 1) * dim_.cols; 
+}
+
+bool Process::Enumerator::first_col() const {
+
+  return pid_ % dim_.cols == 0;
+}
+
+bool Process::Enumerator::last_col() const {
+
+  return (pid_ + 1) % dim_.cols == 0;
+}
+
+Primitive Process::Enumerator::recv(const Pid source, const Tag tag) const {
+
+  Primitive value;
+  MPI_Status status;
+
+  MPI_Recv(&value, 1, MPI_INT, source, static_cast<int>(tag), MPI_COMM_WORLD, &status);
+    
+  if(status.MPI_ERROR) {
+    
+    ss s;
+    s << "MPI_Recv error: " << status.MPI_ERROR;
+
+    throw Abort{ s.str(), ExitCode::MPI_ERROR }; 
+  }
+
+  return value;
+}
+
+void Process::Enumerator::send(const Pid target, const Primitive value, const Tag tag) const {
+
+  MPI_Send(const_cast<Primitive*>(&value), 1, MPI_INT, target, static_cast<int>(tag), MPI_COMM_WORLD);
+}
+
+void Process::Enumerator::recv_dim() {
+
+  size_t values[3];
+  MPI_Bcast(values, sizeof(values) / sizeof(size_t), MPI_UNSIGNED_LONG_LONG, MAIN_PROCESS, MPI_COMM_WORLD);
+
+  dim_.rows = values[0];
+  dim_.cols = values[1];
+  shared_   = values[2];
+}
+
+void Process::Enumerator::enumerate() {
+
+  for (size_t i{ 0 }; i < shared_; ++i) {
+    
+    recv_message();
+    accumulate();
+    propagate();
+  }
+  send_result();
+}
+
+void Process::Enumerator::recv_message() {
+
+  message_.left = recv(pid_left(), Tag::LEFT);
+  message_.up   = recv(pid_up(), Tag::UP);
+}
+
+void Process::Enumerator::accumulate() {
+
+  accumulator_ += message_.left * message_.up;
+}
+
+void Process::Enumerator::propagate() {
+
+  if (!last_col()) {
+
+    send(pid_right(), message_.left, Tag::LEFT);
+  }
+
+  if (!last_row()) {
+
+    send(pid_down(), message_.up, Tag::UP);
+  }
+}
+
+void Process::Enumerator::send_result() {
+
+  send(MAIN_PROCESS, accumulator_, Tag::NONE);
+}
+
 Process::Main::Main(const Pid pid, const int p_count) 
   
   : Enumerator{ pid, p_count }
   , input_{ Matrix{ MAT1 }, Matrix{ MAT2 } }
+  , result_{ MatrixDimensions{ 0, 0 } }
 {
   check_input();
   check_processes();
+
+  dim_    = MatrixDimensions{ input_[0].rows(), input_[1].cols() };
+  shared_ = input_[0].cols();
+
+  result_.resize(dim_);
+}
+
+void Process::Main::run() {
+
+  send_dim();
+  propagate_matrix();
+  enumerate();
+  recv_result();
+  result_.print();
 }
 
 void Process::Main::check_input() const {
 
-  const auto cols = input_[0].cols();
-  const auto rows = input_[1].rows();
+  const auto cols{ input_[0].cols() };
+  const auto rows{ input_[1].rows() };
 
   if(rows != cols) {
 
@@ -299,8 +464,8 @@ void Process::Main::check_input() const {
 
 void Process::Main::check_processes() const {
 
-  const auto rows = input_[0].rows();
-  const auto cols = input_[1].cols();;
+  const auto rows{ input_[0].rows() };
+  const auto cols{ input_[1].cols() };
 
   if(rows * cols != p_count_) {
 
@@ -308,33 +473,44 @@ void Process::Main::check_processes() const {
   }
 }
 
-void Process::Main::run() {
+void Process::Main::send_dim() const {
 
-  Enumerator::run();
-  // TODO print result
+  size_t values[]{ dim_.rows, dim_.cols, shared_ };
+  MPI_Bcast(values, sizeof(values) / sizeof(size_t), MPI_UNSIGNED_LONG_LONG, pid_, MPI_COMM_WORLD);
 }
 
-Process::Enumerator::Enumerator(const Pid pid, const int p_count) 
+void Process::Main::recv_result() {
 
-  : Base{ pid, p_count }
+  for(int i{ 0 }; i < p_count_; ++i) {
 
-{
-  // TODO 
+    result_.set({ i / dim_.cols, i % dim_.cols }, recv(i, Tag::ANY));
+  }
 }
 
-void Process::Enumerator::run() {
+void Process::Main::propagate_matrix() const {
 
-  // TODO
+  for (size_t i{ 0 }; i < shared_; ++i) {
+
+    for(size_t row{ 0 }; row < dim_.rows; ++row) {
+      
+      send(row * dim_.cols, input_[0].get({ row, i }), Tag::LEFT);
+    }
+    
+    for(size_t col{ 0 }; col < dim_.cols; ++col) {
+
+      send(col, input_[1].get({ i, col }), Tag::UP);
+    }
+  }
 }
 
 /* static */ SpecificProcess Application::get_process(const Pid pid, const int p_count) {
 
   if(pid == MAIN_PROCESS) {
 
-    return std::make_unique<Process::Main>(pid, p_count);
+    return new Process::Main{ pid, p_count };
   }
   
-  return std::make_unique<Process::Enumerator>(pid, p_count);
+  return new Process::Enumerator{ pid, p_count };
 }
 
 Application::Application(const int argc, const char* const argv[]) {
@@ -356,6 +532,7 @@ Application::Application(const int argc, const char* const argv[]) {
 Application::~Application() noexcept {
 
   MPI_Finalize();
+  delete process_;
 }
 
 void Application::run() {
