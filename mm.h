@@ -114,7 +114,7 @@ private /* members */:
 };
 
 // various constants
-constexpr bool BENCHMARK      { false };
+constexpr bool BENCHMARK      { true };
 constexpr Pid MAIN_PROCESS    { 0 };    // constant based on OpenMPI
 // assignment based input definition
 constexpr MatrixFile MAT1{ "mat1", MatrixFileDimension::ROWS };

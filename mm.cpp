@@ -10,6 +10,7 @@
 #include <iostream>
 #include <algorithm>
 #include <regex>
+#include <chrono>
 
 // local
 #include "mm.h"
@@ -444,11 +445,30 @@ Process::Main::Main(const Pid pid, const int p_count)
 
 void Process::Main::run() {
 
+  using std::chrono::high_resolution_clock;
+  using std::chrono::duration;
+  using std::chrono::milliseconds;
+
+  const auto t1 = high_resolution_clock::now();
+
   send_dim();
   propagate_matrix();
   enumerate();
   recv_result();
-  result_.print();
+
+  const auto t2 = high_resolution_clock::now();
+
+  // getting number of milliseconds as a double
+  const duration<double, std::milli> diff = t2 - t1;
+
+  if(BENCHMARK) {
+
+    std::cout << diff.count();
+
+  } else {
+
+    result_.print();
+  }
 }
 
 void Process::Main::check_input() const {
