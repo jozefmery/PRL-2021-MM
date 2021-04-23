@@ -1,16 +1,15 @@
 import numpy as np
-import matplotlib as plt
+import matplotlib.pyplot as plt
 import subprocess
 import sys
-from datetime import datetime
 from random import randrange
 
 RUN_TESTS=False
 RUN_BENCHMARKS=True
 MIN_LENGTH=1
-MAX_LENGTH=6
+MAX_LENGTH=10
 TEST_REPETITIONS=30
-BENCH_REPETITIONS=10
+BENCH_REPETITIONS=3
 
 def random_matrix(rows, cols):
   return np.random.randint(-1000, high=1000, size=(rows, cols))
@@ -73,29 +72,36 @@ def run_random_tests():
 
 def run_benchmarks():
 
+  cpus  = []
+  times = []
+
   for dim in range(MIN_LENGTH, MAX_LENGTH + 1):
     time_total = 0
     for _ in range(0, BENCH_REPETITIONS):
 
-        # shared  = randrange(dim) + 1
+      mat1    = random_matrix(dim, dim)
+      mat2    = random_matrix(dim, dim)
 
-        mat1    = random_matrix(dim, dim)
-        mat2    = random_matrix(dim, dim)
+      with open("mat1", "w") as f:
+        print_mat(mat1, "rows", f)
 
-        with open("mat1", "w") as f:
-          print_mat(mat1, "rows", f)
-
-        with open("mat2", "w") as f:
-          print_mat(mat2, "cols", f)
+      with open("mat2", "w") as f:
+        print_mat(mat2, "cols", f)
+  
+      command = "mpirun --prefix /usr/local/share/OpenMPI --oversubscribe -np {} mm".format(dim * dim)
     
-        command = "mpirun --prefix /usr/local/share/OpenMPI --oversubscribe -np {} mm".format(dim * dim)
-        
-        stamp = datetime.now()
-        subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).communicate()
-        diff = datetime.now() - stamp
-        time_total += diff.microseconds
+      stdout = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).communicate()[0].decode("utf-8")
+    
+      time_total += float(stdout)
+    
+    time_total = (time_total / BENCH_REPETITIONS) * 1000
 
-    print("BENCH RESULT: {:.2f}ms for {}x{} matrix".format((time_total / BENCH_REPETITIONS) / 1000, dim, dim))
+    cpus.append(dim * dim)
+    times.append(time_total)
+
+    print("BENCH RESULT: {:.2f}us for {}x{} matrix".format(time_total, dim, dim))
+
+  return (cpus, times)
   
 def main():
 
@@ -105,8 +111,12 @@ def main():
 
   if(RUN_BENCHMARKS):
 
-    run_benchmarks()
-  
+    (x, y) = run_benchmarks()
+    plt.plot(x, y)
+    plt.ylabel("microseconds")
+    plt.xlabel("cpus")
+    plt.grid(True)
+    plt.savefig("bench.png", bbox_inches="tight")
 
 if __name__ == "__main__":
   main()
