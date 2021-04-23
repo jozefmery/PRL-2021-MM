@@ -3,13 +3,14 @@ import matplotlib.pyplot as plt
 import subprocess
 import sys
 from random import randrange
+import statistics
 
 RUN_TESTS=False
 RUN_BENCHMARKS=True
 MIN_LENGTH=1
-MAX_LENGTH=10
+MAX_LENGTH=12
 TEST_REPETITIONS=30
-BENCH_REPETITIONS=3
+BENCH_REPETITIONS=1
 
 def random_matrix(rows, cols):
   return np.random.randint(-1000, high=1000, size=(rows, cols))
@@ -112,10 +113,20 @@ def main():
   if(RUN_BENCHMARKS):
 
     (x, y) = run_benchmarks()
+    plt.grid(True)
+    plt.plot([0, max(x)], [0, max(y)], color="black", linestyle="dashed")
+    mean = statistics.mean(y)
+    plt.plot([0, max(x)], [mean, mean], color="red", linestyle="dashed")
     plt.plot(x, y)
+
+    for px, py in zip(x, y):
+      
+      plt.annotate("{:.0f}".format(py), (px, py), xytext=(0, 4), textcoords='offset points',
+                        ha='center', va='bottom')
+
+    plt.scatter(x, y)
     plt.ylabel("microseconds")
     plt.xlabel("cpus")
-    plt.grid(True)
     plt.savefig("bench.png", bbox_inches="tight")
 
 if __name__ == "__main__":
