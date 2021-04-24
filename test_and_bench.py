@@ -113,18 +113,28 @@ def main():
   if(RUN_BENCHMARKS):
 
     (x, y) = run_benchmarks()
+    maxx = max(x)
+    maxy = max(y) 
+    m, b = np.polyfit(x, y, 1)
     plt.grid(True)
-    plt.plot([0, max(x)], [0, max(y)], color="black", linestyle="dashed")
+    plt.plot([0, maxx], [0, maxy], color="black", linestyle="dashed")
+    plt.annotate("linear", (maxx, maxy), color="black", xytext=(-30, 0), textcoords="offset points")
     mean = statistics.mean(y)
-    plt.plot([0, max(x)], [mean, mean], color="red", linestyle="dashed")
-    plt.plot(x, y)
+    plt.plot([0, maxx], [mean, mean], color="red", linestyle="dashed")
+    plt.annotate("mean: {:.0f}".format(mean), (maxx, mean), xytext=(0, 10), textcoords="offset points", color="red")
+    plt.plot(x, y, color="blue")
+    plt.scatter(x, y, color="blue")
 
+    ypredict = m * np.array(x) + b
+    plt.annotate("prediction", (x[-1], ypredict[-1]), xytext=(0, -15), textcoords="offset points", color="blue")
+    plt.plot(x, ypredict, color="blue", linestyle="dashed")
+
+    switcher = 1
     for px, py in zip(x, y):
       
-      plt.annotate("{:.0f}".format(py), (px, py), xytext=(0, 4), textcoords='offset points',
-                        ha='center', va='bottom')
+      plt.annotate("{:.0f}".format(py), (px, py), xytext=(0,  switcher * 12), textcoords="offset points", color="blue")
+      switcher *= -1
 
-    plt.scatter(x, y)
     plt.ylabel("microseconds")
     plt.xlabel("cpus")
     plt.savefig("bench.png", bbox_inches="tight")
