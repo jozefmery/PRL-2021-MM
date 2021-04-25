@@ -2,7 +2,7 @@
  * File:        mm.cpp
  * Project:     PRL-2021-Proj-2-Mesh-Multiplication
  * Author:      Jozef Méry - xmeryj00@vutbr.cz
- * Date:        15.4.2021
+ * Date:        25.4.2021
  * Description: Mesh multiplication algorithm implementation.
  */
 
