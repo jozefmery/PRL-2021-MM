@@ -8,7 +8,7 @@ import statistics
 RUN_TESTS=False
 RUN_BENCHMARKS=True
 MIN_LENGTH=1
-MAX_LENGTH=12
+MAX_LENGTH=20
 TEST_REPETITIONS=30
 BENCH_REPETITIONS=1
 
@@ -129,11 +129,15 @@ def main():
     plt.annotate("prediction", (x[-1], ypredict[-1]), xytext=(0, -15), textcoords="offset points", color="blue")
     plt.plot(x, ypredict, color="blue", linestyle="dashed")
 
-    switcher = 1
-    for px, py in zip(x, y):
+    # # switcher = 1
+    # switcher = True
+    # for px, py in zip(x, y):
       
-      plt.annotate("{:.0f}".format(py), (px, py), xytext=(0,  switcher * 12), textcoords="offset points", color="blue")
-      switcher *= -1
+    #   # plt.annotate("{:.0f}".format(py), (px, py), xytext=(0,  switcher * 12), textcoords="offset points", color="blue")
+    #   if(switcher):
+    #     plt.annotate("{:.0f}".format(py), (px, py), xytext=(0,  -12), textcoords="offset points", color="blue")
+    #   # switcher *= -1
+    #   switcher = not switcher
 
     plt.ylabel("microseconds")
     plt.xlabel("cpus")
