@@ -5,8 +5,7 @@ import sys
 from random import randrange
 import statistics
 
-RUN_TESTS=False
-RUN_BENCHMARKS=True
+RUN_BENCHMARKS=False
 MIN_LENGTH=1
 MAX_LENGTH=20
 TEST_REPETITIONS=30
@@ -106,10 +105,6 @@ def run_benchmarks():
   
 def main():
 
-  if(RUN_TESTS):
-
-    run_random_tests()
-
   if(RUN_BENCHMARKS):
 
     (x, y) = run_benchmarks()
@@ -142,6 +137,9 @@ def main():
     plt.ylabel("microseconds")
     plt.xlabel("cpus")
     plt.savefig("bench.png", bbox_inches="tight")
+  
+  else:
+    run_random_tests()
 
 if __name__ == "__main__":
   main()
