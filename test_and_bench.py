@@ -94,12 +94,12 @@ def run_benchmarks():
     
       time_total += float(stdout)
     
-    time_total = (time_total / BENCH_REPETITIONS) * 1000
+    time_total = (time_total / BENCH_REPETITIONS)
 
     cpus.append(dim * dim)
     times.append(time_total)
 
-    print("BENCH RESULT: {:.2f}us for {}x{} matrix".format(time_total, dim, dim))
+    print("BENCH RESULT: {:.2f}ms for {}x{} matrix".format(time_total, dim, dim))
 
   return (cpus, times)
   
@@ -134,8 +134,8 @@ def main():
     #   # switcher *= -1
     #   switcher = not switcher
 
-    plt.ylabel("microseconds")
-    plt.xlabel("cpus")
+    plt.ylabel("milliseconds")
+    plt.xlabel("processes")
     plt.savefig("bench.png", bbox_inches="tight")
   
   else:
