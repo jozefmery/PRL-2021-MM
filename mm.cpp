@@ -72,7 +72,7 @@ Matrix::Matrix(const MatrixFile& file) {
 
   if(!handle.good()) {
 
-    ss s;
+    stream s;
     s << "The " << file.name << " input file was not found in the application directory";
 
     throw Abort{ s.str(), ExitCode::INPUT_ERROR };
@@ -135,7 +135,7 @@ void Matrix::check_file_not_empty() const {
 
   if(file_.lines.empty()) {
 
-    ss s;
+    stream s;
     s << "The " << file_.name << " is empty";
 
     throw Abort{ s.str(), ExitCode::INPUT_ERROR };
@@ -152,7 +152,7 @@ void Matrix::check_consistent_rows() const {
 
     if(data_[i].size() != cols) {
 
-      ss s;
+      stream s;
       s << "Inconsistent matrix rows in " << file_.name;
 
       throw Abort{ s.str(), ExitCode::INPUT_ERROR };
@@ -164,7 +164,7 @@ void Matrix::check_matrix_not_empty() const {
 
   if(data_.empty()) {
 
-    ss s;
+    stream s;
     s << "No matrix data in " << file_.name;
 
     throw Abort{ s.str(), ExitCode::INPUT_ERROR };
@@ -185,7 +185,7 @@ Primitive Matrix::read_dimension() const {
   
   } catch(const Abort&) {
 
-    ss s;
+    stream s;
     s << "Invalid dimension \"" << lines[0] << "\" in " << file_.name;
     // rethrow more specific message
     throw Abort{ s.str(), ExitCode::INPUT_ERROR };
@@ -193,7 +193,7 @@ Primitive Matrix::read_dimension() const {
 
   if(dim_value < 1) {
 
-    ss s;
+    stream s;
     s << "Dimension value in " << file_.name << " is less than 1";
     // rethrow more specific message
     throw Abort{ s.str(), ExitCode::INPUT_ERROR };
@@ -215,7 +215,7 @@ vec<Primitive> Matrix::str_to_row(const string& str) const {
   
   } catch(const Abort& a) {
 
-    ss s;
+    stream s;
     s << a.message << " in " << file_.name;
 
     throw Abort{ s.str(), a.code };
@@ -234,7 +234,7 @@ void Matrix::check_contained_dim() const {
 
       if(rows() != dim) {
 
-        ss s;
+        stream s;
         s << "Unexpected number of rows in " << file_.name;
 
         throw Abort{ s.str(), ExitCode::INPUT_ERROR };
@@ -246,7 +246,7 @@ void Matrix::check_contained_dim() const {
 
       if(cols() != dim) {
 
-        ss s;
+        stream s;
         s << "Unexpected number of columns in " << file_.name;
 
         throw Abort{ s.str(), ExitCode::INPUT_ERROR };
@@ -283,11 +283,11 @@ Process::Base::Base(const Pid pid, const int p_count)
 
 string Process::Base::format_error(const string& message) const {
 
-  ss stream;
+  stream s;
 
-  stream << "[ERROR in " << pid_ << "]: " << message << "\n";
+  s << "[ERROR in " << pid_ << "]: " << message << "\n";
 
-  return stream.str();
+  return s.str();
 }
 
 Process::Enumerator::Enumerator(const Pid pid, const int p_count) 
@@ -364,7 +364,7 @@ Primitive Process::Enumerator::recv(const Pid source, const Tag tag) const {
     
   if(status.MPI_ERROR) {
     
-    ss s;
+    stream s;
     s << "MPI_Recv error: " << status.MPI_ERROR;
 
     throw Abort{ s.str(), ExitCode::MPI_ERROR }; 

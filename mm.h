@@ -22,7 +22,7 @@ namespace MM {
 
 // export selected items from std
 using string      = std::string;
-using ss          = std::stringstream;
+using stream      = std::stringstream;
 template<typename T>
 using vec         = std::vector<T>;
 // give raw types meaning
